@@ -2120,12 +2120,12 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
 }
 
 /// Checked C: parse an application of the 'Base' 'RecordDecl' to a number of type
-/// arguments that are yet to be parsed.
+/// arguments that are yet to be parsed. This function can handle both old and new syntax.
 /// 'IsItypeGeneric' is true if we're parsing a type application where the base type
 /// is an "itype generic" (as opposed to a regular generic). This is used when generatingq
 /// error messages.
 ///
-/// generic-struct-instantiation
+/// generic-struct-typeargs-instantiation
 ///   '<' type-name-list '>'
 ///
 /// type-name-list
@@ -2135,14 +2135,35 @@ void Parser::ParseClassSpecifier(tok::TokenKind TagTokKind,
 ///    ',' type-name type-name-list-suffix [opt]
 DeclResult Parser::ParseRecordTypeApplication(RecordDecl *Base, bool IsItypeGeneric) {
   assert(Base->isGenericOrItypeGeneric() && "Instantiated record must be generic");
-  if (Tok.isNot(tok::less)) {
+  bool IsTyArgs = Tok.is(tok::kw__TyArgs);
+  if (Tok.isNot(tok::less) && !IsTyArgs) {
     if (IsItypeGeneric) Diag(Tok.getLocation(), diag::err_expected_type_argument_list_for_itype_generic_instance);
     else Diag(Tok.getLocation(), diag::err_expected_type_argument_list_for_generic_instance);
-    SkipUntil(tok::greater, StopAtSemi);
+    if (IsTyArgs)
+      SkipUntil(tok::r_paren, StopAtSemi);
+    else
+      SkipUntil(tok::greater, StopAtSemi);
     return true;
   }
-  ConsumeToken(); // eat '<'
-  auto ArgsRes = ParseGenericTypeArgumentList(SourceLocation());
+  if (IsTyArgs) {
+    // Skip the _TyArgs keyword.
+    ConsumeToken();
+    if (Tok.is(tok::greater)) {
+      Diag(Tok.getLocation(), diag::err_mismatched_brackets);
+      SkipUntil(tok::greater, StopAtSemi);
+      return true;
+    }
+    if (Tok.isNot(tok::l_paren)) {
+      Diag(Tok, diag::err_expected_lparen_after) << "_TyArgs";
+      SkipUntil(tok::r_paren, StopAtSemi);
+      return true;
+    }
+  }
+  if (IsTyArgs)
+    ConsumeParen(); // eat '('
+  else
+    ConsumeToken(); // eat '<'
+  auto ArgsRes = ParseGenericTypeArgumentList(SourceLocation(), IsTyArgs);
   if (ArgsRes.first) {
     // Problem while parsing the type arguments (error is produced by 'ParseGenericTypeArgumentList')
     return true;
