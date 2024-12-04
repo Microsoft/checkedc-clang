@@ -2085,7 +2085,7 @@ private:
   ExprResult ParseGenericFunctionApplication(ExprResult TypeFunc, SourceLocation Loc);
 
   using TypeArgVector = SmallVector<TypeArgument, 4>;
-  std::pair<bool, TypeArgVector> ParseGenericTypeArgumentList(SourceLocation Loc);
+  std::pair<bool, TypeArgVector> ParseGenericTypeArgumentList(SourceLocation Loc, bool IsTyArgs=false);
 
   QualType SubstituteTypeVariable(QualType QT,
     SmallVector<TypeArgument, 4> &typeNames);

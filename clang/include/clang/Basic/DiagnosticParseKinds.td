@@ -1549,14 +1549,17 @@ def err_unbalanced_parentheses_in_where_clause : Error<
 def err_expected_list_of_types_expr_for_generic_function : Error<
   "expected a list of type arguments for a generic function">;
 
-def err_type_function_comma_or_greater_expected : Error<
-  "expected , or >">;
+def err_type_function_comma_or_closing_expected : Error<
+  "expected , or %0">;
 
 def err_num_type_args_params_mistmatch : Error<
   "generic struct takes %0 type arguments, but instantiation provided %1">;
 
 def err_expected_type_argument_list_for_generic_instance : Error<
   "expected a type argument list for a generic struct type">;
+
+def err_mismatched_brackets : Error<
+  "found '<' after _TyArgs, use '(' instead">;
 
 def err_expected_type_argument_list_for_itype_generic_instance : Error<
   "expected a type argument list for a struct with a bounds-safe interface in a checked scope">;

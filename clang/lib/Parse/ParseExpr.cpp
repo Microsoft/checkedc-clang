@@ -3816,18 +3816,24 @@ ExprResult Parser::ParseBoundsExpression() {
 // This is re-used for both generic functions and generic structs.
 // Return false if parsing succeeds, in which case the 'typeArgs' is also populated.
 // Return true if parsing fails.
-std::pair<bool, Parser::TypeArgVector> Parser::ParseGenericTypeArgumentList(SourceLocation Loc) {
+std::pair<bool, Parser::TypeArgVector> Parser::ParseGenericTypeArgumentList(SourceLocation Loc, bool IsTyArgs) {
   Parser::TypeArgVector typeArgumentInfos;
   auto err = std::make_pair<>(true, Parser::TypeArgVector());
   auto firstTypeArgument = true;
   // Expect to see a list of type names, followed by a '>'.
-  while (Tok.getKind() != tok::greater) {
+  tok::TokenKind ExpectedEndToken = IsTyArgs ? tok::r_paren : tok::greater;
+  StringRef ExpectedEndTokenStr = IsTyArgs ? ")" : ">";
+  while (Tok.getKind() != ExpectedEndToken) {
     if (!firstTypeArgument) {
       if (ExpectAndConsume(tok::comma,
-        diag::err_type_function_comma_or_greater_expected)) {
-        // We want to consume greater, but not consume semi
-        SkipUntil(tok::greater, StopAtSemi | StopBeforeMatch);
+        diag::err_type_function_comma_or_closing_expected, ExpectedEndTokenStr)) {
+        // We want to consume greater or r_paren, but not consume semi
+        if (IsTyArgs)
+          SkipUntil(tok::r_paren, StopAtSemi | StopBeforeMatch);
+        else
+          SkipUntil(tok::greater, StopAtSemi | StopBeforeMatch);
         if (Tok.getKind() == tok::greater) ConsumeToken();
+        if (Tok.getKind() == tok::r_paren) ConsumeParen();
         return err;
       }
     } else
@@ -3838,8 +3844,12 @@ std::pair<bool, Parser::TypeArgVector> Parser::ParseGenericTypeArgumentList(Sour
     if (Ty.isInvalid()) {
       // We do not need to write an error message since ParseTypeName does.
       // We want to consume greater, but not consume semi
-      SkipUntil(tok::greater, StopAtSemi | StopBeforeMatch);
+      if (IsTyArgs)
+        SkipUntil(tok::r_paren, StopAtSemi | StopBeforeMatch);
+      else
+        SkipUntil(tok::greater, StopAtSemi | StopBeforeMatch);
       if (Tok.getKind() == tok::greater) ConsumeToken();
+      if (Tok.getKind() == tok::r_paren) ConsumeParen();
       return err;
     }
 
@@ -3847,7 +3857,10 @@ std::pair<bool, Parser::TypeArgVector> Parser::ParseGenericTypeArgumentList(Sour
     QualType realType = Actions.GetTypeFromParser(Ty.get(), &TInfo);
     typeArgumentInfos.push_back({ realType, TInfo });
   }
-  ConsumeToken(); // consume '>' token
+  if (IsTyArgs)
+    ConsumeParen(); // consume ')' token
+  else
+    ConsumeToken(); // consume '>' token
 
   return std::make_pair(false, typeArgumentInfos);
 }
@@ -3876,7 +3889,7 @@ Parser::ParseGenericMacroTypeArgumentList(SourceLocation Loc) {
       if (Tok.getKind() == tok::comma) { // consume comma
         ConsumeToken();
       } else if (Tok.getKind() != tok::r_paren && !typeArgumentInfos.empty()) {
-        Diag(Tok, diag::err_type_function_comma_or_greater_expected);
+        Diag(Tok, diag::err_type_function_comma_or_closing_expected);
         return handleError();
       }
     } else {
